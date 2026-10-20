@@ -1,0 +1,4 @@
+# Replace localhost with your domain; Caddy then provisions HTTPS automatically.
+localhost {
+	reverse_proxy web:3000
+}

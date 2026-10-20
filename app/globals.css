@@ -1,0 +1,264 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Dark styles apply under the `.dark` class, which next-themes sets from the theme menu (or the OS setting on "System"). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Shorthand state variants used by the shadcn/ui components (e.g. `data-open:animate-in`).
+ * Radix exposes state as data-state="open" and orientation as data-orientation, so map them here.
+ */
+@custom-variant data-open (&:where([data-state="open"], [data-open]:not([data-open="false"])));
+@custom-variant data-closed (&:where([data-state="closed"], [data-closed]:not([data-closed="false"])));
+@custom-variant data-checked (&:where([data-state="checked"], [data-checked]:not([data-checked="false"])));
+@custom-variant data-unchecked (&:where([data-state="unchecked"], [data-unchecked]:not([data-unchecked="false"])));
+@custom-variant data-active (&:where([data-state="active"], [data-active]:not([data-active="false"])));
+@custom-variant data-horizontal (&:where([data-orientation="horizontal"]));
+@custom-variant data-vertical (&:where([data-orientation="vertical"]));
+
+/*
+ * Embark palette. Light values here, dark values under `.dark` below.
+ * Mint, sky, and sun are tile/badge backgrounds, always paired with their "-ink" shade for text.
+ * Every text/background pair meets WCAG AA (4.5:1) in both themes.
+ */
+:root {
+  --radius: 0.75rem;
+  color-scheme: light;
+
+  /* shadcn/ui tokens */
+  --background: #f5f8f8;
+  --foreground: #1a2b2c;
+  --card: #ffffff;
+  --card-foreground: #1a2b2c;
+  --popover: #ffffff;
+  --popover-foreground: #1a2b2c;
+  --primary: #007c81;
+  --primary-foreground: #ffffff;
+  --secondary: #e8f1f1;
+  --secondary-foreground: #1a2b2c;
+  --muted: #eef3f3;
+  --muted-foreground: #5e6b6c;
+  --accent: #e3f1f1;
+  --accent-foreground: #004d52;
+  --destructive: #ba3b69;
+  --destructive-foreground: #ffffff;
+  --border: #dce6e6;
+  --input: #cfdcdc;
+  --ring: #007c81;
+
+  /* Onboarding chart series (validated for colour-vision deficiency in each theme) */
+  --chart-started: #3b7fc4;
+  --chart-completed: #2e9e47;
+
+  /* Charts: teal, green, orange, raspberry, sky-ink — distinguishable and readable on white */
+  --chart-1: #007c81;
+  --chart-2: #2e9e47;
+  --chart-3: #ba5400;
+  --chart-4: #ba3b69;
+  --chart-5: #3b7fc4;
+
+  /* Sidebar: teal panel with a mint active marker */
+  --sidebar: #007c81;
+  --sidebar-foreground: #eaf8f8;
+  --sidebar-primary: #d3fcdc;
+  --sidebar-primary-foreground: #004d52;
+  --sidebar-accent: #00585c;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #00686d;
+  --sidebar-ring: #d3fcdc;
+  --sidebar-active: #ffffff;
+  --sidebar-active-foreground: #007c81;
+
+  /* Brand extras */
+  --primary-dark: #00585c;
+  --primary-ink: #004d52;
+  /* The dark pill button ("Add employee") */
+  --primary-strong: #004d52;
+  --primary-strong-foreground: #ffffff;
+  /* The one bold teal card per page, and the mint used on teal surfaces (same in both themes) */
+  --highlight: #007c81;
+  --brand-mint: #d3fcdc;
+  --mint: #d3fcdc;
+  --sky: #afdbff;
+  --sun: #f5eb68;
+
+  /* Status: solid colour for bars/icons, soft background + ink for badges */
+  --success: #2e9e47;
+  --success-foreground: #ffffff;
+  --success-soft: #d3fcdc;
+  --success-ink: #1e6b27;
+  --info-soft: #afdbff;
+  --info-ink: #004d52;
+  --pending-soft: #f5eb68;
+  --pending-ink: #4a4000;
+  --warning: #ba5400;
+  --warning-soft: #fbe6d6;
+  --warning-ink: #8a3e00;
+  --danger-soft: #ffe3eb;
+  --danger-ink: #9c2f57;
+  --neutral-soft: #e8eeee;
+  --neutral-ink: #3d4b4c;
+
+  /* Card elevation */
+  --card-shadow: 0 1px 2px rgba(16, 40, 40, 0.04), 0 12px 32px -18px rgba(0, 77, 82, 0.18);
+  --raised-shadow: 0 8px 24px -12px rgba(0, 77, 82, 0.35);
+  --highlight-shadow: 0 24px 48px -24px rgba(0, 124, 129, 0.8);
+  --sidebar-shadow: 0 20px 40px -20px rgba(0, 124, 129, 0.55);
+}
+
+/* Dark theme: deep teal-grey surfaces; brand colours lifted so text stays readable. */
+.dark {
+  color-scheme: dark;
+
+  --background: #0c1516;
+  --foreground: #e2eded;
+  --card: #142122;
+  --card-foreground: #e2eded;
+  --popover: #172627;
+  --popover-foreground: #e2eded;
+  --primary: #2fb5ba;
+  --primary-foreground: #04282a;
+  --secondary: #1b2b2c;
+  --secondary-foreground: #e2eded;
+  --muted: #1a2829;
+  --muted-foreground: #95a7a8;
+  --accent: #173739;
+  --accent-foreground: #a6e4e6;
+  --destructive: #f0789f;
+  --destructive-foreground: #2b0715;
+  --border: #243738;
+  --input: #2e4445;
+  --ring: #2fb5ba;
+
+  --chart-started: #4489d0;
+  --chart-completed: #36a852;
+  --chart-1: #2fb5ba;
+  --chart-2: #36a852;
+  --chart-3: #e07a2b;
+  --chart-4: #f0789f;
+  --chart-5: #4489d0;
+
+  --sidebar: #0a4e52;
+  --sidebar-foreground: #d4eded;
+  --sidebar-primary: #d3fcdc;
+  --sidebar-primary-foreground: #004d52;
+  --sidebar-accent: #0d6267;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #0b585c;
+  --sidebar-ring: #d3fcdc;
+  --sidebar-active: #d3fcdc;
+  --sidebar-active-foreground: #004d52;
+
+  --primary-dark: #4cc6cb;
+  --primary-ink: #8edcdf;
+  --primary-strong: #d3fcdc;
+  --primary-strong-foreground: #003d40;
+  --highlight: #0b5e62;
+  --mint: #15392a;
+  --sky: #13314b;
+  --sun: #36310f;
+
+  --success: #4cbb64;
+  --success-foreground: #062a10;
+  --success-soft: #15392a;
+  --success-ink: #8fe3a4;
+  --info-soft: #13314b;
+  --info-ink: #a9d3ff;
+  --pending-soft: #36310f;
+  --pending-ink: #efe37a;
+  --warning: #e07a2b;
+  --warning-soft: #3a2414;
+  --warning-ink: #f6b07a;
+  --danger-soft: #3d1625;
+  --danger-ink: #f6a3bf;
+  --neutral-soft: #1e2d2e;
+  --neutral-ink: #c0cfd0;
+
+  --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 12px 32px -18px rgba(0, 0, 0, 0.7);
+  --raised-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 8px 24px -12px rgba(0, 0, 0, 0.8);
+  --highlight-shadow: 0 24px 48px -24px rgba(0, 0, 0, 0.8);
+  --sidebar-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.7);
+}
+
+@theme inline {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-ink: var(--primary-ink);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-strong-foreground: var(--primary-strong-foreground);
+  --color-highlight: var(--highlight);
+  --color-brand-mint: var(--brand-mint);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-active-foreground: var(--sidebar-active-foreground);
+  --color-mint: var(--mint);
+  --color-sky: var(--sky);
+  --color-sun: var(--sun);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
+  --color-success-ink: var(--success-ink);
+  --color-info-soft: var(--info-soft);
+  --color-info-ink: var(--info-ink);
+  --color-pending-soft: var(--pending-soft);
+  --color-pending-ink: var(--pending-ink);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-ink: var(--warning-ink);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-ink: var(--danger-ink);
+  --color-neutral-soft: var(--neutral-soft);
+  --color-neutral-ink: var(--neutral-ink);
+
+  --shadow-card: var(--card-shadow);
+  --shadow-raised: var(--raised-shadow);
+  --shadow-highlight: var(--highlight-shadow);
+  --shadow-sidebar: var(--sidebar-shadow);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}

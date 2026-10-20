@@ -1,0 +1,556 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum EmployeeStatus {
+  PRE_BOARDING
+  ONBOARDING
+  ACTIVE
+  INACTIVE
+}
+
+enum ProcessStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  SKIPPED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+/// Who a template task is handed to when onboarding starts.
+enum AssigneeType {
+  HR_MANAGER
+  REPORTING_MANAGER
+  EMPLOYEE
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_DUE_SOON
+  TASK_OVERDUE
+  TASK_COMPLETED
+  DOCUMENT_UPLOADED
+  DOCUMENT_APPROVED
+  DOCUMENT_REJECTED
+  DOCUMENT_EXPIRING
+  DOCUMENT_EXPIRED
+  ONBOARDING_STARTED
+  ONBOARDING_COMPLETED
+  SYSTEM
+}
+
+// ─── Auth (tables owned by Better Auth) ──────────────────────────────────────
+
+model User {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  /// Deactivated users cannot sign in. Users are never hard-deleted.
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  sessions          Session[]
+  accounts          Account[]
+  roles             UserRole[]
+  employee          Employee?            @relation("EmployeeUser")
+  managedEmployees  Employee[]           @relation("EmployeeHrManager")
+  employeesCreated  Employee[]           @relation("EmployeeCreatedBy")
+  templatesCreated  OnboardingTemplate[]
+  processesCreated  OnboardingProcess[]
+  taskAssignments   TaskAssignment[]     @relation("TaskAssignee")
+  assignmentsMade   TaskAssignment[]     @relation("TaskAssigner")
+  statusChanges     TaskStatusHistory[]
+  documentsUploaded Document[]           @relation("DocumentUploader")
+  documentsReviewed Document[]           @relation("DocumentReviewer")
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  invitesSent       EmployeeInvite[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @default(now()) @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@index([identifier])
+  @@map("verifications")
+}
+
+// ─── RBAC ────────────────────────────────────────────────────────────────────
+
+model Role {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  /// Stable identifier used in code, e.g. HR_ADMIN.
+  key         String   @unique
+  name        String
+  description String?
+  /// System roles are seeded and cannot be deleted.
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  users       UserRole[]
+  permissions RolePermission[]
+  employees   Employee[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(dbgenerated("(gen_random_uuid())::text"))
+  /// e.g. employee:create
+  key         String  @unique
+  description String?
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+// ─── Organisation ────────────────────────────────────────────────────────────
+
+model Department {
+  id           String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  name         String   @unique
+  code         String?  @unique
+  description  String?
+  /// The HR person (their employee record) who owns this department's people. Set by the database admin.
+  hrEmployeeId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  hrEmployee   Employee?            @relation("DepartmentHr", fields: [hrEmployeeId], references: [id], onDelete: SetNull)
+  designations Designation[]
+  employees    Employee[]           @relation("DepartmentMembers")
+  templates    OnboardingTemplate[]
+
+  @@index([hrEmployeeId])
+  @@map("departments")
+}
+
+model Designation {
+  id           String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  title        String
+  departmentId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  employees  Employee[]
+
+  @@unique([departmentId, title])
+  @@map("designations")
+}
+
+model Employee {
+  id                 String         @id @default(dbgenerated("(gen_random_uuid())::text"))
+  employeeCode       String         @unique
+  /// Null until the employee registers on the sign-up page with this email.
+  userId             String?        @unique
+  firstName          String
+  lastName           String
+  email              String         @unique
+  phone              String?
+  departmentId       String?
+  designationId      String?
+  /// The employee this person reports to (their line manager).
+  reportingManagerId String?
+  /// Fallback HR for employees whose department has no HR. When the department has an HR, that person is in charge.
+  hrManagerId        String?
+  /// Role this person gets when they register. Set by HR; synced to user_roles.
+  roleKey            String         @default("EMPLOYEE")
+  joiningDate        DateTime       @db.Date
+  status             EmployeeStatus @default(PRE_BOARDING)
+  archivedAt         DateTime?
+  createdById        String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @default(now()) @updatedAt
+
+  user             User?               @relation("EmployeeUser", fields: [userId], references: [id], onDelete: SetNull)
+  department       Department?         @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: Restrict)
+  designation      Designation?        @relation(fields: [designationId], references: [id], onDelete: Restrict)
+  role             Role                @relation(fields: [roleKey], references: [key], onDelete: Restrict, onUpdate: Cascade)
+  reportingManager Employee?           @relation("ReportingLine", fields: [reportingManagerId], references: [id], onDelete: SetNull)
+  directReports    Employee[]          @relation("ReportingLine")
+  hrForDepartments Department[]        @relation("DepartmentHr")
+  invites          EmployeeInvite[]
+  hrManager        User?               @relation("EmployeeHrManager", fields: [hrManagerId], references: [id], onDelete: SetNull)
+  createdBy        User?               @relation("EmployeeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  processes        OnboardingProcess[]
+  documents        Document[]
+
+  @@index([departmentId])
+  @@index([hrManagerId])
+  @@index([reportingManagerId])
+  @@index([status])
+  @@index([archivedAt])
+  @@map("employees")
+}
+
+/// One-time sign-up link sent in the welcome email. Only a SHA-256 hash of the token is stored.
+model EmployeeInvite {
+  id          String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  employeeId  String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  employee  Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([employeeId])
+  @@map("employee_invites")
+}
+
+// ─── Onboarding templates ────────────────────────────────────────────────────
+
+model OnboardingTemplate {
+  id           String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  name         String
+  description  String?
+  /// Optional: suggest this template for a department.
+  departmentId String?
+  isActive     Boolean  @default(true)
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  department Department?         @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdBy  User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  steps      TemplateStep[]
+  processes  OnboardingProcess[]
+
+  @@map("onboarding_templates")
+}
+
+model TemplateStep {
+  id         String @id @default(dbgenerated("(gen_random_uuid())::text"))
+  templateId String
+  title      String
+  order      Int
+
+  template OnboardingTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  tasks    TemplateTask[]
+
+  @@unique([templateId, order])
+  @@map("template_steps")
+}
+
+model TemplateTask {
+  id             String       @id @default(dbgenerated("(gen_random_uuid())::text"))
+  stepId         String
+  title          String
+  description    String?
+  assigneeType   AssigneeType
+  /// Due date = employee joining date + this many days (may be negative for pre-boarding).
+  dueOffsetDays  Int          @default(0)
+  priority       TaskPriority @default(MEDIUM)
+  order          Int
+  /// If set, completing this task means uploading a document of this type.
+  documentTypeId String?
+
+  step         TemplateStep  @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  documentType DocumentType? @relation(fields: [documentTypeId], references: [id], onDelete: SetNull)
+
+  @@unique([stepId, order])
+  @@map("template_tasks")
+}
+
+// ─── Onboarding processes ────────────────────────────────────────────────────
+
+model OnboardingProcess {
+  id          String        @id @default(dbgenerated("(gen_random_uuid())::text"))
+  employeeId  String
+  templateId  String?
+  status      ProcessStatus @default(NOT_STARTED)
+  startDate   DateTime      @db.Date
+  targetDate  DateTime?     @db.Date
+  completedAt DateTime?
+  cancelledAt DateTime?
+  createdById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
+
+  employee  Employee                @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  template  OnboardingTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdBy User?                   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  steps     OnboardingProcessStep[]
+  tasks     OnboardingTask[]
+
+  @@index([employeeId])
+  @@index([status])
+  @@map("onboarding_processes")
+}
+
+model OnboardingProcessStep {
+  id        String @id @default(dbgenerated("(gen_random_uuid())::text"))
+  processId String
+  title     String
+  order     Int
+
+  process OnboardingProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+  tasks   OnboardingTask[]
+
+  @@unique([processId, order])
+  @@map("onboarding_process_steps")
+}
+
+model OnboardingTask {
+  id             String        @id @default(dbgenerated("(gen_random_uuid())::text"))
+  processId      String
+  stepId         String?
+  title          String
+  description    String?
+  assigneeType   AssigneeType?
+  priority       TaskPriority  @default(MEDIUM)
+  status         TaskStatus    @default(TODO)
+  /// Overdue is derived (dueDate < now and not DONE/SKIPPED), never stored.
+  dueDate        DateTime?     @db.Date
+  order          Int           @default(0)
+  documentTypeId String?
+  completedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @default(now()) @updatedAt
+
+  process      OnboardingProcess      @relation(fields: [processId], references: [id], onDelete: Cascade)
+  step         OnboardingProcessStep? @relation(fields: [stepId], references: [id], onDelete: SetNull)
+  documentType DocumentType?          @relation(fields: [documentTypeId], references: [id], onDelete: SetNull)
+  assignments  TaskAssignment[]
+  history      TaskStatusHistory[]
+  documents    Document[]
+
+  @@index([processId])
+  @@index([status, dueDate])
+  @@map("onboarding_tasks")
+}
+
+model TaskAssignment {
+  id           String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  taskId       String
+  userId       String
+  assignedById String?
+  assignedAt   DateTime @default(now())
+
+  task       OnboardingTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User           @relation("TaskAssignee", fields: [userId], references: [id], onDelete: Restrict)
+  assignedBy User?          @relation("TaskAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@map("task_assignments")
+}
+
+model TaskStatusHistory {
+  id          String      @id @default(dbgenerated("(gen_random_uuid())::text"))
+  taskId      String
+  fromStatus  TaskStatus?
+  toStatus    TaskStatus
+  changedById String?
+  note        String?
+  createdAt   DateTime    @default(now())
+
+  task      OnboardingTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  changedBy User?          @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@map("task_status_history")
+}
+
+// ─── Documents ───────────────────────────────────────────────────────────────
+
+model DocumentType {
+  id               String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  name             String   @unique
+  description      String?
+  /// Every employee must provide this document during onboarding.
+  isRequired       Boolean  @default(false)
+  hasExpiry        Boolean  @default(false)
+  allowedMimeTypes String[]
+  maxSizeBytes     Int      @default(10485760)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  documents     Document[]
+  templateTasks TemplateTask[]
+  tasks         OnboardingTask[]
+
+  @@map("document_types")
+}
+
+model Document {
+  id              String         @id @default(dbgenerated("(gen_random_uuid())::text"))
+  employeeId      String
+  documentTypeId  String?
+  taskId          String?
+  uploadedById    String?
+  fileName        String
+  /// Object key in the private MinIO bucket.
+  storageKey      String         @unique
+  mimeType        String
+  fileSize        Int
+  status          DocumentStatus @default(PENDING)
+  expiryDate      DateTime?      @db.Date
+  reviewedById    String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  deletedAt       DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @default(now()) @updatedAt
+
+  employee     Employee        @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  documentType DocumentType?   @relation(fields: [documentTypeId], references: [id], onDelete: SetNull)
+  task         OnboardingTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  uploadedBy   User?           @relation("DocumentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  reviewedBy   User?           @relation("DocumentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([expiryDate])
+  @@map("documents")
+}
+
+// ─── Notifications and audit ─────────────────────────────────────────────────
+
+model Notification {
+  id           String           @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId       String
+  type         NotificationType
+  title        String
+  body         String?
+  /// In-app path to open, e.g. /tasks/abc123
+  link         String?
+  readAt       DateTime?
+  /// Outbox: true until the worker has queued the email for this notification.
+  emailPending Boolean          @default(false)
+  emailedAt    DateTime?
+  /// Set by scheduled reminders so the same reminder is never created twice, e.g. due-soon:<taskId>:2026-11-02
+  dedupeKey    String?          @unique
+  createdAt    DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@index([emailPending])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  actorId    String?
+  /// e.g. employee.create, document.approve
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
