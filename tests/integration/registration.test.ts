@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { archiveEmployee, createEmployee, resendWelcomeEmail } from "@/features/employees/service";
+import { archiveEmployee, createEmployee, inviteFromDatabaseAdmin, resendWelcomeEmail } from "@/features/employees/service";
 import { auth } from "@/lib/auth/auth";
 import { createInvite, getInviteDetails, registerWithInvite } from "@/lib/auth/registration";
 import { loadUserContext } from "@/lib/auth/rbac";
@@ -91,5 +91,28 @@ describe("registration via welcome link", () => {
     const stored = await prisma.employeeInvite.findFirstOrThrow({ where: { employeeId: employee.id } });
     expect(stored.tokenHash).not.toContain(token);
     expect(await createInvite(prisma, employee.id, null)).not.toBe(token);
+  });
+});
+
+describe("invites sent by the database admin (npm run invite)", () => {
+  it("lets someone added directly in Postgres, like the first HR Admin, create their login", async () => {
+    await prisma.employee.create({
+      data: { employeeCode: "DBA-1", firstName: "Ira", lastName: "Admin", email: "ira@example.com", joiningDate: new Date("2026-01-05"), roleKey: "HR_ADMIN" },
+    });
+    sent.mockClear();
+    const result = await inviteFromDatabaseAdmin("IRA@example.com");
+    expect(result).toMatchObject({ email: "ira@example.com", emailed: true });
+    expect(sent).toHaveBeenCalledTimes(1);
+    expect(sent.mock.calls[0][0].to).toBe("ira@example.com");
+
+    const token = result.url.match(/token=([\w-]+)/)![1];
+    const { userId } = await registerWithInvite(form(token));
+    expect((await loadUserContext(userId))?.roles).toEqual(["HR_ADMIN"]);
+  });
+
+  it("refuses unknown, archived, and already-registered people", async () => {
+    await expect(inviteFromDatabaseAdmin("nobody@example.com")).rejects.toThrow("No employee");
+    const { employee } = await createPerson("EMPLOYEE");
+    await expect(inviteFromDatabaseAdmin(employee.email)).rejects.toThrow("already created their login");
   });
 });

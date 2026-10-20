@@ -19,6 +19,7 @@
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "department:set-hr": "tsx --import ./scripts/server-only-hook.mjs scripts/set-department-hr.ts",
+    "invite": "tsx --import ./scripts/server-only-hook.mjs scripts/send-invite.ts",
     "worker": "node --import tsx --import ./scripts/server-only-hook.mjs lib/queue/worker.ts",
     "jobs:daily": "tsx --import ./scripts/server-only-hook.mjs scripts/run-daily-jobs.ts",
     "demo:seed": "tsx --import ./scripts/server-only-hook.mjs scripts/demo-data.ts",

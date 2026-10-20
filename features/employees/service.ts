@@ -452,6 +452,22 @@ export async function resendWelcomeEmail(user: CurrentUser, id: string) {
   await audit(prisma, { actorId: user.id, action: "employee.invite", entityType: "Employee", entityId: id });
 }
 
+/**
+ * For the database admin (npm run invite): emails a sign-up link to someone added directly in Postgres, such as
+ * the first HR Admin, who has nobody in the app to invite them. Returns the link so it can be shown when needed.
+ */
+export async function inviteFromDatabaseAdmin(email: string) {
+  const employee = await prisma.employee.findFirst({ where: { email: { equals: email, mode: "insensitive" } } });
+  if (!employee) throw new ActionError(`No employee with email ${email}. Add them to the employees table first.`);
+  if (employee.archivedAt) throw new ActionError(`${employee.email} is archived.`);
+  if (employee.userId) throw new ActionError(`${employee.email} has already created their login.`);
+
+  const inviteToken = await createInvite(prisma, employee.id, null);
+  const emailed = await sendWelcomeEmail(employee, "Your administrator", inviteToken);
+  await audit(prisma, { actorId: null, action: "employee.invite", entityType: "Employee", entityId: employee.id });
+  return { email: employee.email, url: `${env.APP_URL}/sign-up?token=${inviteToken}`, emailed };
+}
+
 // ─── Department HR ───────────────────────────────────────────────────────────
 
 /**
