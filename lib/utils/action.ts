@@ -3,6 +3,7 @@ import { unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { AuthError } from "@/lib/auth/rbac";
+import { flushNotificationEmailsAfterResponse } from "@/lib/jobs/notification-emails";
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
@@ -19,7 +20,9 @@ export class ActionError extends Error {
 /** Runs a server action body and turns known failures into a user-facing ActionResult. */
 export async function runAction<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
-    return { ok: true, data: await fn() };
+    const data = await fn();
+    flushNotificationEmailsAfterResponse();
+    return { ok: true, data };
   } catch (error) {
     unstable_rethrow(error); // let Next.js redirect() and notFound() through
     if (error instanceof z.ZodError) {

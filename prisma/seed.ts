@@ -7,7 +7,12 @@ async function main() {
   await seedRolesAndPermissions();
   await seedOrganisation();
   await seedTemplate();
-  await ensureBucket();
+  try {
+    await ensureBucket();
+  } catch (error) {
+    // Hosted storage (e.g. Cloudflare R2) often uses keys that can't create buckets: create it in the dashboard.
+    console.warn(`Couldn't check or create the storage bucket; make sure it exists. (${(error as Error).message})`);
+  }
   console.log("Seed complete");
 }
 

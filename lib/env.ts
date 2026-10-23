@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** A blank value (e.g. an empty setting in a hosting dashboard) counts as not set. */
+const optional = <T extends z.ZodType>(type: T) => z.preprocess((v) => (v === "" ? undefined : v), type.optional());
+
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   APP_URL: z.url(),
@@ -8,7 +11,8 @@ const schema = z.object({
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
   DATABASE_URL: z.url(),
-  REDIS_URL: z.url(),
+  // Optional: without Redis (e.g. on Vercel) e-mails are sent during the request and there is no worker.
+  REDIS_URL: optional(z.url()),
   S3_ENDPOINT: z.url(),
   S3_REGION: z.string().min(1),
   S3_ACCESS_KEY: z.string().min(1),
@@ -19,6 +23,8 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   MAIL_FROM: z.string().min(1),
+  // Protects /api/cron/daily (Vercel Cron sends it as a bearer token).
+  CRON_SECRET: optional(z.string().min(16)),
 });
 
 /**

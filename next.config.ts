@@ -8,7 +8,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Docker runs the small standalone server; Vercel builds its own output.
+  output: process.env.VERCEL ? undefined : "standalone",
   poweredByHeader: false,
   serverExternalPackages: ["bullmq", "ioredis"],
   async headers() {

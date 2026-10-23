@@ -1,5 +1,6 @@
 import { HeadBucketCommand } from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/db/prisma";
+import { env } from "@/lib/env";
 import { getRedis } from "@/lib/queue/redis";
 import { bucket, s3 } from "@/lib/storage/s3";
 
@@ -17,10 +18,10 @@ async function check(fn: () => Promise<unknown>) {
 export async function GET() {
   const [database, cache, storage] = await Promise.all([
     check(() => prisma.$queryRaw`SELECT 1`),
-    check(() => getRedis().ping()),
+    env.REDIS_URL ? check(() => getRedis().ping()) : Promise.resolve("not used" as const),
     check(() => s3.send(new HeadBucketCommand({ Bucket: bucket }))),
   ]);
-  const healthy = database === "ok" && cache === "ok" && storage === "ok";
+  const healthy = database === "ok" && cache !== "down" && storage === "ok";
 
   return Response.json(
     { status: healthy ? "ok" : "degraded", database, redis: cache, storage },

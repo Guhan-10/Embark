@@ -7,6 +7,7 @@ export const BASE_URL = `http://localhost:${E2E_PORT}`;
 /** Every person the e2e fixtures create uses this domain, so their emails are easy to find (and clear) in Mailpit. */
 export const E2E_DOMAIN = "e2e.embark.test";
 export const PASSWORD = "E2e-Pass-2026";
+export const SERVERLESS = Boolean(process.env.E2E_SERVERLESS);
 export const MAILPIT_URL = process.env.MAILPIT_URL ?? "http://localhost:8025";
 
 function required(name: string) {
@@ -29,5 +30,7 @@ export function e2eEnv(): NodeJS.ProcessEnv {
     REDIS_URL: redis.toString(),
     APP_URL: BASE_URL,
     BETTER_AUTH_URL: BASE_URL,
+    // E2E_SERVERLESS=1 runs the app as on Vercel: no Redis and no worker, e-mails sent during requests.
+    ...(SERVERLESS ? { REDIS_URL: "", NEXT_PUBLIC_MAX_UPLOAD_MB: "4" } : {}),
   };
 }

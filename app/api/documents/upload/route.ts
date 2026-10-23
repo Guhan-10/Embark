@@ -21,7 +21,8 @@ export async function POST(request: Request) {
   // Refuse obviously oversized bodies before reading them (form overhead allowed for).
   const length = Number(request.headers.get("content-length") ?? 0);
   if (length > MAX_UPLOAD_BYTES + 64 * 1024) {
-    return Response.json({ ok: false, error: "That file is too large. The limit is 10 MB." }, { status: 413 });
+    const limitMb = Math.floor(MAX_UPLOAD_BYTES / 1024 / 1024);
+    return Response.json({ ok: false, error: `That file is too large. The limit is ${limitMb} MB.` }, { status: 413 });
   }
 
   let form: FormData;

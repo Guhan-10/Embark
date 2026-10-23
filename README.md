@@ -283,6 +283,42 @@ Before deploying:
 
 Back up the `postgres_data` and `storage_data` Docker volumes. They hold all records and uploaded files.
 
+### Deploying to Vercel
+
+Vercel runs the app without containers, so the database, file storage and e-mail come from hosted services. There is no Redis and no worker:
+
+- **E-mails** (welcome links, notifications) are sent during the request that creates them.
+- **Daily reminders and expiry checks** run from a Vercel Cron job (`vercel.json`, 08:00 IST) that calls `/api/cron/daily`.
+- **Uploads** are limited to 4 MB, because Vercel rejects request bodies over 4.5 MB.
+
+| Need | Free option | Settings it gives you |
+|---|---|---|
+| PostgreSQL | [Neon](https://neon.tech) | `DATABASE_URL` (use the pooled connection string) |
+| File storage | [Cloudflare R2](https://developers.cloudflare.com/r2/) | `S3_ENDPOINT` (`https://<account-id>.r2.cloudflarestorage.com`), `S3_REGION=auto`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` |
+| E-mail | [Brevo](https://www.brevo.com) SMTP, or Gmail with an app password | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` |
+
+1. Create the services above. In R2, create the bucket yourself, plus an API token with object read and write access.
+2. Create the tables and reference data in the hosted database, from your machine. `.env` must hold the Neon and R2 values while you run these:
+   ```bash
+   npx prisma migrate deploy
+   npx prisma db seed
+   ```
+3. In Vercel, import the GitHub repository and add these environment variables:
+   - `DATABASE_URL`, the `S3_*` settings, the `SMTP_*` settings and `MAIL_FROM`
+   - `BETTER_AUTH_SECRET` (`openssl rand -base64 32`)
+   - `CRON_SECRET` (any random string of 16 characters or more)
+   - `NEXT_PUBLIC_MAX_UPLOAD_MB=4`
+   - `NEXT_PUBLIC_APP_TIMEZONE=Asia/Kolkata`
+   - `APP_URL` and `BETTER_AUTH_URL`: your site's address, such as `https://your-project.vercel.app`
+
+   Leave `REDIS_URL` unset. Deploy.
+4. Add the first HR people with the SQL in [Setting up your company](#setting-up-your-company), using Neon's SQL editor. Then send their links from your machine, with `.env` pointing at Neon and `APP_URL` set to the Vercel address:
+   ```bash
+   npm run invite -- priya.sharma@company.com --print-link
+   ```
+
+Sign-in rate limits are kept in each server instance's memory, so on Vercel they are looser than on a single server.
+
 ---
 
 ## Security

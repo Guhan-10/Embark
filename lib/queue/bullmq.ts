@@ -19,7 +19,12 @@ export const JOBS = {
 
 /** Workers block on Redis, so each needs its own connection that retries forever. */
 export function workerConnection() {
-  return new IORedis(env.REDIS_URL, { maxRetriesPerRequest: null });
+  return new IORedis(requireRedisUrl(), { maxRetriesPerRequest: null });
+}
+
+function requireRedisUrl() {
+  if (!env.REDIS_URL) throw new Error("REDIS_URL is not set, so there is no queue or worker.");
+  return env.REDIS_URL;
 }
 
 const globalForQueues = globalThis as unknown as { embarkEmailQueue?: Queue };
@@ -31,7 +36,7 @@ const globalForQueues = globalThis as unknown as { embarkEmailQueue?: Queue };
 function emailQueue() {
   globalForQueues.embarkEmailQueue ??= new Queue(QUEUES.EMAIL, {
     prefix: QUEUE_PREFIX,
-    connection: new IORedis(env.REDIS_URL, { enableOfflineQueue: false, maxRetriesPerRequest: 1 }),
+    connection: new IORedis(requireRedisUrl(), { enableOfflineQueue: false, maxRetriesPerRequest: 1 }),
   });
   return globalForQueues.embarkEmailQueue;
 }
